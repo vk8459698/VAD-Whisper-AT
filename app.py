@@ -60,6 +60,41 @@ INSTRUMENTAL_TAGS = {
     "Angry music", "Scary music"
 }
 
+# Genre tags for fancy music classification
+GENRE_TAGS = {
+    # Main genres
+    "Pop music", "Rock music", "Jazz", "Classical music", "Electronic music",
+    "Blues", "Country", "Folk music", "Reggae", "Funk", "Soul music",
+    "Rhythm and blues", "Gospel music", "Opera", "Hip hop music",
+    
+    # Electronic subgenres
+    "House music", "Techno", "Dubstep", "Drum and bass", "Electronica",
+    "Electronic dance music", "Ambient music", "Trance music",
+    
+    # Rock subgenres
+    "Heavy metal", "Punk rock", "Grunge", "Progressive rock", "Rock and roll",
+    "Psychedelic rock",
+    
+    # World music
+    "Music of Latin America", "Salsa music", "Flamenco", "Music of Africa",
+    "Afrobeat", "Music of Asia", "Carnatic music", "Music of Bollywood",
+    "Middle Eastern music", "Traditional music",
+    
+    # Other genres
+    "Swing music", "Bluegrass", "Ska", "Disco", "New-age music",
+    "Independent music", "Christian music", "Soundtrack music",
+    "Theme music", "Video game music", "Dance music", "Wedding music",
+    "Christmas music", "Music for children",
+    
+    # Mood/style tags
+    "Happy music", "Funny music", "Sad music", "Tender music",
+    "Exciting music", "Angry music", "Scary music",
+    
+    # Vocal styles
+    "A capella", "Vocal music", "Choir", "Chant", "Mantra", "Lullaby",
+    "Beatboxing", "Rapping", "Yodeling"
+}
+
 def load_vad_model():
     """Load Silero VAD model"""
     print("Loading Silero VAD model...")
@@ -168,6 +203,14 @@ def detect_vocals_vad(file_path, model, get_speech_timestamps):
         if temp_file and os.path.exists(temp_file.name):
             os.unlink(temp_file.name)
 
+def extract_genre_tags(top_tags):
+    """Extract genre tags from detected top tags"""
+    detected_genres = []
+    for tag in top_tags:
+        if tag in GENRE_TAGS:
+            detected_genres.append(tag)
+    return detected_genres
+
 def classify_audio_tags(top_tags):
     """Classify audio based on detected tags"""
     # Check for definitive speech tags first - if any are present, it's definitely vocal
@@ -198,7 +241,7 @@ def classify_with_tagging(audio_path, model_size="small"):
         try:
             import whisper_at as whisper
         except ImportError:
-            return "Error: whisper-at not installed. Please run the setup script."
+            return "Error: whisper-at not installed. Please run the setup script.", []
     
     print(f"Loading Whisper-AT model ({model_size}) for detailed classification...")
     
@@ -232,11 +275,14 @@ def classify_with_tagging(audio_path, model_size="small"):
         
         print(f"Detected tags: {', '.join(top_tags[:5])}...")  # Show first 5 tags
         
+        # Extract genre tags
+        genre_tags = extract_genre_tags(top_tags)
+        
         classification = classify_audio_tags(top_tags)
-        return classification
+        return classification, genre_tags
         
     except Exception as e:
-        return f"Error in tagging: {str(e)}"
+        return f"Error in tagging: {str(e)}", []
 
 def main():
     parser = argparse.ArgumentParser(description='Classify audio files using VAD and audio tagging')
@@ -281,23 +327,35 @@ def main():
     if not vad_result['vocal_detected']:
         # No vocals detected - classify as instrumental
         final_classification = "Instrumental"
+        detected_genres = []
         print(f"\n Final Classification: {final_classification}")
         print("   Reason: No vocals detected by VAD")
     else:
         # Vocals detected - use tagging for detailed classification
         if args.vad_only:
             final_classification = "Vocal (VAD detected)"
+            detected_genres = []
             print(f"\n Final Classification: {final_classification}")
             print("Reason: Vocals detected by VAD (detailed tagging skipped)")
         else:
             print(f"\n  Running audio tagging for detailed classification...")
-            tag_classification = classify_with_tagging(audio_path, args.model)
+            tag_classification, detected_genres = classify_with_tagging(audio_path, args.model)
             final_classification = tag_classification
             print(f"\n Final Classification: {final_classification}")
             print("Reason: Vocals detected by VAD, classified using audio tagging")
     
+    # Display genre information
+    if detected_genres:
+        print(f"\n  Detected Genres/Styles:")
+        for i, genre in enumerate(detected_genres, 1):
+            print(f"   {i}. {genre}")
+    else:
+        print(f"\n  Detected Genres/Styles: None detected")
+    
     print("\n" + "=" * 60)
     print(f"FINAL RESULT: {final_classification}")
+    if detected_genres:
+        print(f"GENRES: {', '.join(detected_genres)}")
     print("=" * 60)
 
 if __name__ == '__main__':
