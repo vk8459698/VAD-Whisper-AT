@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # For VAD functionality
 pip install torch>=1.9.0 torchaudio>=0.9.0
 sudo apt update && sudo apt install ffmpeg
@@ -9,3 +11,7 @@ curl https://sh.rustup.rs -sSf | sh -s -- -y
 source $HOME/.cargo/env
 pip install --no-cache-dir tiktoken==0.3.3
 pip install --no-deps whisper-at
+
+# For caption generation
+pip install openai
+pip install python-dotenv
