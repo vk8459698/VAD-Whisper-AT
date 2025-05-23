@@ -1,0 +1,423 @@
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 41918_voc.wav
+Processing audio file: 41918_voc.wav
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: Yes
+   Speech Percentage: 96.67%
+   Total Duration: 43.61 seconds
+   Speech Duration: 42.16 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.23 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Speech, Rapping, Music, Male speech, man speaking, Narration, monologue...
+
+ Final Classification: Speech/Vocal
+   Reason: Vocals detected by VAD, classified using audio tagging
+
+  Detected Genres/Styles:
+   1. Rapping
+   2. Hip hop music
+   3. Vocal music
+   4. Beatboxing
+
+============================================================
+FINAL RESULT: Speech/Vocal
+GENRES: Rapping, Hip hop music, Vocal music, Beatboxing
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 41918_song.wav
+Processing audio file: 41918_song.wav
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: Yes
+   Speech Percentage: 83.9%
+   Total Duration: 43.61 seconds
+   Speech Duration: 36.59 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.21 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Music, Rapping, Hip hop music, Rhythm and blues, Speech...
+
+ Final Classification: Song
+   Reason: Vocals detected by VAD, classified using audio tagging
+
+  Detected Genres/Styles:
+   1. Rapping
+   2. Hip hop music
+   3. Rhythm and blues
+   4. Exciting music
+   5. Independent music
+   6. Jazz
+   7. Blues
+   8. Funk
+   9. Pop music
+   10. Soundtrack music
+   11. Reggae
+
+============================================================
+FINAL RESULT: Song
+GENRES: Rapping, Hip hop music, Rhythm and blues, Exciting music, Independent music, Jazz, Blues, Funk, Pop music, Soundtrack music, Reggae
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 41918_acco.wav
+Processing audio file: 41918_acco.wav
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: No
+   Speech Percentage: 0.0%
+   Total Duration: 43.61 seconds
+   Speech Duration: 0.0 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.12 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Music, Electronic music, Drum and bass, Electronica, Gospel music...
+
+ Final Classification: Instrumental
+   Reason: No vocals detected by VAD (definitive decision)
+
+  Detected Genres/Styles:
+   1. Electronic music
+   2. Drum and bass
+   3. Electronica
+   4. Gospel music
+   5. Dubstep
+   6. Soul music
+   7. Rhythm and blues
+   8. Afrobeat
+   9. New-age music
+   10. House music
+   11. Hip hop music
+   12. Disco
+   13. Ambient music
+
+  Detected Instruments (Top Tags):
+   1. Synthesizer
+   2. Organ
+
+============================================================
+FINAL RESULT: Instrumental
+GENRES: Electronic music, Drum and bass, Electronica, Gospel music, Dubstep, Soul music, Rhythm and blues, Afrobeat, New-age music, House music, Hip hop music, Disco, Ambient music
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 10_LeadVoc.wav
+Error: Audio file '10_LeadVoc.wav' not found.
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 10_LeadVox.wav
+Processing audio file: 10_LeadVox.wav
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: Yes
+   Speech Percentage: 5.67%
+   Total Duration: 29.05 seconds
+   Speech Duration: 1.65 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.28 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Female singing, Singing, Yodeling, Humming, Inside, small room...
+
+ Final Classification: Vocal
+   Reason: Vocals detected by VAD, classified using audio tagging
+
+  Detected Genres/Styles:
+   1. Yodeling
+   2. Lullaby
+   3. A capella
+
+============================================================
+FINAL RESULT: Vocal
+GENRES: Yodeling, Lullaby, A capella
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 01_Kick.wav
+Processing audio file: 01_Kick.wav
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: No
+   Speech Percentage: 0.0%
+   Total Duration: 29.05 seconds
+   Speech Duration: 0.0 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.16 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Music, Heart murmur, Heart sounds, heartbeat, Drum machine, Musical instrument...
+
+ Final Classification: Instrumental
+   Reason: No vocals detected by VAD (definitive decision)
+
+  Detected Genres/Styles:
+   1. Electronic music
+   2. Techno
+
+  Detected Instruments (Top Tags):
+   1. Drum machine
+   2. Drum
+   3. Synthesizer
+   4. Bass drum
+   5. Percussion
+   6. Drum kit
+
+============================================================
+FINAL RESULT: Instrumental
+GENRES: Electronic music, Techno
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 02_Snare.wav
+Processing audio file: 02_Snare.wav
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: No
+   Speech Percentage: 0.0%
+   Total Duration: 29.05 seconds
+   Speech Duration: 0.0 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.27 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Drum, Drum kit, Snare drum, Bass drum, Music...
+
+ Final Classification: Instrumental
+   Reason: No vocals detected by VAD (definitive decision)
+
+  Detected Genres/Styles: None detected
+
+  Detected Instruments (Top Tags):
+   1. Drum
+   2. Drum kit
+   3. Snare drum
+   4. Bass drum
+   5. Percussion
+   6. Cymbal
+   7. Hi-hat
+   8. Guitar
+   9. Drum machine
+   10. Synthesizer
+
+============================================================
+FINAL RESULT: Instrumental
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py HumanMistakes_Preview.mp3
+Processing audio file: HumanMistakes_Preview.mp3
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: No
+   Speech Percentage: 0.0%
+   Total Duration: 23.35 seconds
+   Speech Duration: 0.0 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.32 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Music, Drum and bass, Dubstep, Electronic music, Speech...
+
+ Final Classification: Instrumental
+   Reason: No vocals detected by VAD (definitive decision)
+
+  Detected Genres/Styles:
+   1. Drum and bass
+   2. Dubstep
+   3. Electronic music
+   4. Dance music
+   5. Trance music
+   6. Electronica
+   7. House music
+   8. Rhythm and blues
+   9. Disco
+   10. Hip hop music
+
+  Detected Instruments (Top Tags): None detected
+
+============================================================
+FINAL RESULT: Instrumental
+GENRES: Drum and bass, Dubstep, Electronic music, Dance music, Trance music, Electronica, House music, Rhythm and blues, Disco, Hip hop music
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 34qei9.mp3
+Processing audio file: 34qei9.mp3
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 48000 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: Yes
+   Speech Percentage: 64.52%
+   Total Duration: 104.16 seconds
+   Speech Duration: 67.2 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.39 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Speech, Male speech, man speaking, Narration, monologue, Conversation, Inside, small room...
+
+ Final Classification: Speech/Vocal
+   Reason: Vocals detected by VAD, classified using audio tagging
+
+  Detected Genres/Styles: None detected
+
+============================================================
+FINAL RESULT: Speech/Vocal
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 9p9d0u.mp3
+Processing audio file: 9p9d0u.mp3
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: Yes
+   Speech Percentage: 71.72%
+   Total Duration: 75.0 seconds
+   Speech Duration: 53.79 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.15 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Speech, Narration, monologue, Male speech, man speaking, Female speech, woman speaking, Conversation...
+
+ Final Classification: Speech/Vocal
+   Reason: Vocals detected by VAD, classified using audio tagging
+
+  Detected Genres/Styles: None detected
+
+============================================================
+FINAL RESULT: Speech/Vocal
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py 57318d.mp3
+Processing audio file: 57318d.mp3
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 44100 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: Yes
+   Speech Percentage: 84.62%
+   Total Duration: 306.55 seconds
+   Speech Duration: 259.39 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.29 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Speech, Speech synthesizer, Narration, monologue, Male speech, man speaking, Female speech, woman speaking...
+
+ Final Classification: Speech/Vocal
+   Reason: Vocals detected by VAD, classified using audio tagging
+
+  Detected Genres/Styles: None detected
+
+============================================================
+FINAL RESULT: Speech/Vocal
+@gokusaiyan786 ➜ /workspaces/codespaces-blank $ python app.py gentle-instrumental-1-322812.mp3
+Processing audio file: gentle-instrumental-1-322812.mp3
+============================================================
+Loading Silero VAD model...
+Using cache found in /home/codespace/.cache/torch/hub/snakers4_silero-vad_master
+Resampling from 48000 Hz to 16000 Hz...
+
+  VAD Results:
+   Vocal Detected: No
+   Speech Percentage: 0.0%
+   Total Duration: 240.05 seconds
+   Speech Duration: 0.0 seconds
+
+  Running audio tagging for detailed classification...
+Loading Whisper-AT model (small) for detailed classification...
+Model loaded in 2.22 seconds.
+/usr/local/python/3.12.1/lib/python3.12/site-packages/whisper_at/transcribe.py:120: UserWarning: FP16 is not supported on CPU; using FP32 instead
+  warnings.warn("FP16 is not supported on CPU; using FP32 instead")
+/workspaces/codespaces-blank/app.py:247: UserWarning: Current at_time_res is 4.80 second, the audio tagging model is trained with time resolution of 10 seconds. Mismatch time resolution may cause an audio tagging performance drop, but won't impact ASR performance.
+  result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
+Detected tags: Music, Vibraphone, Piano, Glockenspiel, Electric piano...
+
+ Final Classification: Instrumental
+   Reason: No vocals detected by VAD (definitive decision)
+
+  Detected Genres/Styles:
+   1. New-age music
+   2. Lullaby
+   3. Tender music
+   4. Soundtrack music
+   5. Sad music
+   6. Ambient music
+   7. Theme music
+   8. Video game music
+   9. Wedding music
+   10. Electronic music
+   11. Classical music
+
+  Detected Instruments (Top Tags):
+   1. Vibraphone
+   2. Piano
+   3. Electric piano
+   4. Marimba, xylophone
+   5. Keyboard (musical)
+   6. Harp
+   7. Synthesizer
+   8. Organ
+   9. Harpsichord
+   10. Electronic organ
+   11. Hammond organ
+   12. Plucked string instrument
+   13. Flute
+
+============================================================
+FINAL RESULT: Instrumental
+GENRES: New-age music, Lullaby, Tender music, Soundtrack music, Sad music, Ambient music, Theme music, Video game music, Wedding music, Electronic music, Classical music
