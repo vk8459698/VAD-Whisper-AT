@@ -33,31 +33,15 @@ DEFINITIVE_SPEECH_TAGS = {
 }
 
 INSTRUMENTAL_TAGS = {
-    "Piano", "Electric piano", "Keyboard (musical)", "Musical instrument",
-    "Synthesizer", "Organ", "New-age music", "Electronic organ", 
-    "Christmas music", "Rhythm and blues", "Independent music", "Soundtrack music", 
-    "Pop music", "Jazz", "Soul music", "Christian music", "Instrumental music", 
-    "Harpsichord", "Guitar", "Bass guitar", "Drums", "Violin", "Trumpet", 
-    "Flute", "Saxophone", "Plucked string instrument", "Electric guitar", 
-    "Acoustic guitar", "Steel guitar, slide guitar", "Banjo", "Sitar", "Mandolin", 
-    "Ukulele", "Hammond organ", "Sampler", "Percussion", "Drum kit","Musical instrument", 
-    "Drum machine", "Drum", "Snare drum", "Bass drum", "Timpani", "Tabla", 
-    "Cymbal", "Hi-hat", "Tambourine", "Marimba, xylophone", 
-    "Vibraphone", "Orchestra", "Brass instrument",
-    "French horn", "Trombone", "Bowed string instrument", "String section", 
-    "Violin, fiddle", "Cello", "Double bass", "Wind instrument, woodwind instrument", 
-    "Clarinet", "Harp", "Harmonica", "Accordion", 
-    "Rock music", "Heavy metal", "Punk rock", "Grunge", "Progressive rock", 
-    "Rock and roll", "Psychedelic rock", "Reggae", "Country", "Swing music", 
-    "Bluegrass", "Funk", "Folk music", "Middle Eastern music", "Disco", 
-    "Classical music", "Electronic music", "House music", "Techno", "Dubstep", 
-    "Drum and bass", "Electronica", "Electronic dance music", "Ambient music", 
-    "Trance music", "Music of Latin America", "Salsa music", "Flamenco", "Blues", 
-    "Music for children", "Music of Africa", "Afrobeat", "Music of Asia", 
-    "Carnatic music", "Music of Bollywood", "Ska", "Traditional music", 
-    "Song", "Theme music", "Video game music", "Dance music", "Wedding music", 
-    "Happy music", "Funny music", "Sad music", "Tender music", "Exciting music", 
-    "Angry music", "Scary music"
+    "Piano", "Electric piano", "Keyboard (musical)", "Synthesizer", "Organ",
+    "Electronic organ", "Harpsichord", "Guitar", "Bass guitar", "Drums", "Violin",
+    "Trumpet", "Flute", "Saxophone", "Plucked string instrument", "Electric guitar",
+    "Acoustic guitar", "Steel guitar, slide guitar", "Banjo", "Sitar", "Mandolin",
+    "Ukulele", "Hammond organ", "Percussion", "Drum kit", "Drum machine", "Drum",
+    "Snare drum", "Bass drum", "Timpani", "Tabla", "Cymbal", "Hi-hat", "Tambourine",
+    "Marimba, xylophone", "Vibraphone", "Brass instrument", "French horn", "Trombone",
+    "Bowed string instrument", "String section", "Violin, fiddle", "Cello", "Double bass",
+    "Wind instrument, woodwind instrument", "Clarinet", "Harp", "Harmonica", "Accordion"
 }
 
 # Genre tags for fancy music classification
@@ -211,6 +195,14 @@ def extract_genre_tags(top_tags):
             detected_genres.append(tag)
     return detected_genres
 
+def extract_instrumental_tags(top_tags):
+    """Extract instrumental tags from detected top tags"""
+    detected_instruments = []
+    for tag in top_tags:
+        if tag in INSTRUMENTAL_TAGS:
+            detected_instruments.append(tag)
+    return detected_instruments
+
 def classify_audio_tags(top_tags):
     """Classify audio based on detected tags"""
     # Check for definitive speech tags first - if any are present, it's definitely vocal
@@ -224,11 +216,11 @@ def classify_audio_tags(top_tags):
     has_instrumental = any(tag in INSTRUMENTAL_TAGS for tag in top_tags)
 
     if has_vocal and not has_instrumental:
-        return "Vocal/Song"
+        return "Vocal"
     elif has_instrumental and not has_vocal:
         return "Instrumental"
     elif has_vocal and has_instrumental:
-        return "Song (Mixed)"
+        return "Song"
     else:
         return "Unknown"
 
@@ -241,7 +233,7 @@ def classify_with_tagging(audio_path, model_size="small"):
         try:
             import whisper_at as whisper
         except ImportError:
-            return "Error: whisper-at not installed. Please run the setup script.", []
+            return "Error: whisper-at not installed. Please run the setup script.", [], [], []
     
     print(f"Loading Whisper-AT model ({model_size}) for detailed classification...")
     
@@ -275,14 +267,22 @@ def classify_with_tagging(audio_path, model_size="small"):
         
         print(f"Detected tags: {', '.join(top_tags[:5])}...")  # Show first 5 tags
         
-        # Extract genre tags
+        # Extract genre and instrumental tags
         genre_tags = extract_genre_tags(top_tags)
+        instrumental_tags = extract_instrumental_tags(top_tags)
         
         classification = classify_audio_tags(top_tags)
-        return classification, genre_tags
+        
+        # Return all detected tags along with classification
+        return classification, genre_tags, instrumental_tags, top_tags
         
     except Exception as e:
-        return f"Error in tagging: {str(e)}", []
+        return f"Error in tagging: {str(e)}", [], [], []
+
+def is_vocal_classification(classification):
+    """Check if the classification indicates vocal/speech content"""
+    vocal_keywords = ["vocal", "speech", "song"]
+    return any(keyword in classification.lower() for keyword in vocal_keywords)
 
 def main():
     parser = argparse.ArgumentParser(description='Classify audio files using VAD and audio tagging')
@@ -323,26 +323,34 @@ def main():
     print(f"   Total Duration: {vad_result['total_duration']} seconds")
     print(f"   Speech Duration: {vad_result['speech_duration']} seconds")
     
-    # Step 2: Classification Logic
-    if not vad_result['vocal_detected']:
-        # No vocals detected - classify as instrumental
-        final_classification = "Instrumental"
-        detected_genres = []
-        print(f"\n Final Classification: {final_classification}")
-        print("   Reason: No vocals detected by VAD")
-    else:
-        # Vocals detected - use tagging for detailed classification
-        if args.vad_only:
+    # Step 2: Classification Logic - Always run tagging unless --vad-only is specified
+    if args.vad_only:
+        # VAD-only mode
+        if vad_result['vocal_detected']:
             final_classification = "Vocal (VAD detected)"
-            detected_genres = []
-            print(f"\n Final Classification: {final_classification}")
-            print("Reason: Vocals detected by VAD (detailed tagging skipped)")
         else:
-            print(f"\n  Running audio tagging for detailed classification...")
-            tag_classification, detected_genres = classify_with_tagging(audio_path, args.model)
+            final_classification = "Instrumental (No vocals detected by VAD)"
+        detected_genres = []
+        detected_instruments = []
+        all_detected_tags = []
+        print(f"\n Final Classification: {final_classification}")
+        print("   Reason: VAD-only mode (detailed tagging skipped)")
+    else:
+        # Always run tagging for detailed classification
+        print(f"\n  Running audio tagging for detailed classification...")
+        tag_classification, detected_genres, detected_instruments, all_detected_tags = classify_with_tagging(audio_path, args.model)
+        
+        # Use VAD as the definitive decision maker
+        if vad_result['vocal_detected']:
+            # VAD detected vocals - use tagging for detailed classification
             final_classification = tag_classification
             print(f"\n Final Classification: {final_classification}")
-            print("Reason: Vocals detected by VAD, classified using audio tagging")
+            print("   Reason: Vocals detected by VAD, classified using audio tagging")
+        else:
+            # VAD detected no vocals - it's definitely instrumental regardless of tagging
+            final_classification = "Instrumental"
+            print(f"\n Final Classification: {final_classification}")
+            print("   Reason: No vocals detected by VAD (definitive decision)")
     
     # Display genre information
     if detected_genres:
@@ -352,11 +360,20 @@ def main():
     else:
         print(f"\n  Detected Genres/Styles: None detected")
     
+    # Only display instrumental tags if the final classification is NOT vocal/speech
+    if not is_vocal_classification(final_classification):
+        instrumental_top_tags = [tag for tag in detected_instruments if tag in all_detected_tags]
+        if instrumental_top_tags:
+            print(f"\n  Detected Instruments (Top Tags):")
+            for i, instrument in enumerate(instrumental_top_tags, 1):
+                print(f"   {i}. {instrument}")
+        else:
+            print(f"\n  Detected Instruments (Top Tags): None detected")
+    
     print("\n" + "=" * 60)
     print(f"FINAL RESULT: {final_classification}")
     if detected_genres:
         print(f"GENRES: {', '.join(detected_genres)}")
-    print("=" * 60)
 
 if __name__ == '__main__':
-    main()
+    main() 
