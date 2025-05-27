@@ -307,7 +307,7 @@ def classify_audio_tags(top_tags):
     has_definitive_speech = any(tag in DEFINITIVE_SPEECH_TAGS for tag in top_tags)
     
     if has_definitive_speech:
-        return "Speech/Vocal"
+        return "Vocal"
     
     # Regular classification logic as fallback
     has_vocal = any(tag in VOCAL_TAGS for tag in top_tags)
@@ -319,8 +319,6 @@ def classify_audio_tags(top_tags):
         return "Instrumental"
     elif has_vocal and has_instrumental:
         return "Song"
-    else:
-        return "Unknown"
 
 def classify_with_tagging(audio_path, model_size="small"):
     """Classify audio using Whisper-AT tagging"""
