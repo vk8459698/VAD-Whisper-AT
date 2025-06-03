@@ -1,60 +1,12 @@
-#!/usr/bin/env python3
-
+import json
+from openai import OpenAI
+from typing import List, Dict, Any
+from dataclasses import dataclass
 import os
-import sys
-import torch
-import torchaudio
-import subprocess
-import tempfile
-import argparse
-import time
-import openai
-import re
 from collections import defaultdict
-from typing import Dict, List, Tuple, Optional
+import re
 
-# Try to load .env file if python-dotenv is available
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass  # python-dotenv not installed, continue without it
-
-# Import whisper_at only when needed (for tagging)
-whisper = None
-
-# Define known vocal and instrumental tags for classification
-VOCAL_TAGS = {
-    "Singing", "Speech", "Choir", "Female singing", "Male singing",
-    "Chant", "Yodeling", "Shout", "Bellow", "Rapping", "Narration",
-    "Child singing", "Vocal music", "Opera", "A capella", "Voice",
-    "Male speech, man speaking", "Female speech, woman speaking",
-    "Child speech, kid speaking", "Conversation", "Narration, monologue", 
-    "Babbling", "Speech synthesizer", "Whoop", "Yell", "Battle cry",
-    "Children shouting", "Screaming", "Whispering", "Mantra",
-    "Synthetic singing", "Humming", "Whistling", "Beatboxing",
-    "Gospel music", "Lullaby", "Groan", "Grunt"
-}
-
-# Definitive speech tags that guarantee vocal classification
-DEFINITIVE_SPEECH_TAGS = {
-    "Male speech, man speaking", "Female speech, woman speaking",
-    "Child speech, kid speaking", "Conversation", "Narration, monologue"
-}
-
-INSTRUMENTAL_TAGS = {
-    "Piano", "Electric piano", "Keyboard (musical)", "Synthesizer", "Organ",
-    "Electronic organ", "Harpsichord", "Guitar", "Bass guitar", "Drums", "Violin",
-    "Trumpet", "Flute", "Saxophone", "Plucked string instrument", "Electric guitar",
-    "Acoustic guitar", "Steel guitar, slide guitar", "Banjo", "Sitar", "Mandolin",
-    "Ukulele", "Hammond organ", "Percussion", "Drum kit", "Drum machine", "Drum",
-    "Snare drum", "Bass drum", "Timpani", "Tabla", "Cymbal", "Hi-hat", "Tambourine",
-    "Marimba, xylophone", "Vibraphone", "Brass instrument", "French horn", "Trombone",
-    "Bowed string instrument", "String section", "Violin, fiddle", "Cello", "Double bass",
-    "Wind instrument, woodwind instrument", "Clarinet", "Harp", "Harmonica", "Accordion"
-}
-
-# Genre tags for fancy music classification
+# Allowed genre tags - your specific list
 GENRE_TAGS = {
     # Main genres
     "Pop music", "Rock music", "Jazz", "Classical music", "Electronic music",
@@ -89,425 +41,549 @@ GENRE_TAGS = {
     "Beatboxing", "Rapping", "Yodeling"
 }
 
-class AudioCaptionGenerator:
-    def __init__(self, api_key: str):
-        """
-        Initialize the caption generator with OpenAI API key
-        
-        Args:
-            api_key (str): Your OpenAI API key
-        """
-        self.client = openai.OpenAI(api_key=api_key)
+# Allowed classification types
+CLASSIFICATION_TYPES = ["vocal", "instrumental", "song"]
+
+@dataclass
+class Song:
+    """Individual song data structure - simplified"""
+    tags: List[str]  # Genre/style tags (must be from GENRE_TAGS)
+    classification: str  # Must be: vocal/instrumental/song
     
-    def create_caption_prompt(self, classification: str, genres: List[str]) -> str:
-        """
-        Create a prompt for OpenAI to generate an audio caption
-        
-        Args:
-            classification (str): Type of audio (Speech/Vocal, Song, Instrumental)
-            genres (List[str]): List of genre tags
-            
-        Returns:
-            str: Formatted prompt for OpenAI
-        """
-        genre_list = ", ".join(genres) if genres else "Various"
-        
-        prompt = f"""Create a descriptive and engaging caption for an audio track with the following characteristics:
+@dataclass
+class CoreStyle:
+    """Core style data structure"""
+    name: str
+    description: str
+    tags: List[str]
+    signature_sound_tags: List[str]
+    songs: List[int]  # indices of songs in this style
 
-Classification: {classification}
-Genres: {genre_list}
+@dataclass
+class ArtistDNA:
+    """Artist DNA level summary"""
+    dna_tags: List[str]
 
-Please write a caption that:
-1. Describes the audio in an engaging way
-2. Incorporates the key genres naturally
-3. Matches the classification type (vocal/instrumental/speech)
-4. Is suitable for social media or music platforms
-5. Is concise but descriptive (1-2 sentences)
-
-Caption:"""
-        
-        return prompt
+class OpenAIMusicCategorizer:
+    """
+    Music style categorization system using OpenAI API
+    Creates core styles, signature sounds, and DNA-level tags
+    """
     
-    def generate_caption(self, classification: str, genres: List[str], 
-                        model: str = "gpt-3.5-turbo", temperature: float = 0.7) -> Dict:
-        """
-        Generate a caption for the audio based on classification and genres
-        
-        Args:
-            classification (str): Audio classification
-            genres (List[str]): List of detected genres
-            model (str): OpenAI model to use
-            temperature (float): Creativity level (0.0 to 1.0)
+    def __init__(self, api_key: str = None, model: str = "gpt-4o"):
+        # Set up OpenAI client with new API format
+        if api_key:
+            self.client = OpenAI(api_key=api_key)
+        else:
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                raise ValueError("OpenAI API key must be provided either as parameter or environment variable OPENAI_API_KEY")
+            self.client = OpenAI(api_key=api_key)
             
-        Returns:
-            Dict: Contains original data, prompt, and generated caption
-        """
+        # Use a model that supports JSON mode
+        self.model = model
+        if model == "gpt-4":
+            print("  Note: Switching to gpt-4o for JSON response format support")
+            self.model = "gpt-4o"
+            
+        self.songs = []
+        self.core_styles = []
+        self.artist_dna = None
+        
+    def validate_song_input(self, tags: List[str], classification: str) -> bool:
+        """Validate that tags and classification are from allowed lists"""
+        # Check classification
+        if classification.lower() not in [c.lower() for c in CLASSIFICATION_TYPES]:
+            print(f"Warning: Classification '{classification}' not in allowed types: {CLASSIFICATION_TYPES}")
+            return False
+            
+        # Check tags
+        invalid_tags = []
+        for tag in tags:
+            if tag not in GENRE_TAGS:
+                invalid_tags.append(tag)
+                
+        if invalid_tags:
+            print(f"Warning: Invalid tags found: {invalid_tags}")
+            print("Allowed tags are from GENRE_TAGS list")
+            return False
+            
+        return True
+        
+    def add_song(self, tags: List[str], classification: str):
+        """Add a song to the collection with validation"""
+        # Validate input
+        if not self.validate_song_input(tags, classification):
+            print(f"Skipping song with invalid input")
+            return False
+            
+        song = Song(tags, classification.lower())
+        self.songs.append(song)
+        return True
+        
+    def extract_json_from_response(self, response_text: str) -> Dict:
+        """Extract JSON from response text, handling cases where it might not be pure JSON"""
         try:
-            # Create prompt
-            prompt = self.create_caption_prompt(classification, genres)
+            # First try to parse as pure JSON
+            return json.loads(response_text.strip())
+        except json.JSONDecodeError:
+            # If that fails, try to find JSON within the response
+            json_pattern = r'\{.*\}'
+            matches = re.findall(json_pattern, response_text, re.DOTALL)
+            if matches:
+                try:
+                    return json.loads(matches[0])
+                except json.JSONDecodeError:
+                    pass
             
-            # Generate caption using OpenAI
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You are a creative music and audio content writer who creates engaging captions for audio tracks."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=temperature,
-                max_tokens=150
+            # If all else fails, return None
+            print(f"Could not extract JSON from response: {response_text[:200]}...")
+            return None
+        
+    def call_openai_api(self, messages: List[Dict], max_tokens: int = 1000, temperature: float = 0.3):
+        """Make API call to OpenAI using new client format"""
+        try:
+            # Try with JSON mode first
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    response_format={"type": "json_object"}
+                )
+                return response.choices[0].message.content
+            except Exception as json_error:
+                print(f"JSON mode failed, falling back to regular mode: {json_error}")
+                # Fallback to regular mode without JSON format
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature
+                )
+                return response.choices[0].message.content
+                
+        except Exception as e:
+            print(f"OpenAI API Error: {e}")
+            return None
+            
+    def classify_songs_into_core_styles(self, artist_name: str = "Artist") -> Dict[str, Any]:
+        """Use OpenAI to classify songs into core styles (1-10 max)"""
+        
+        # Prepare song data for OpenAI
+        songs_data = []
+        for i, song in enumerate(self.songs):
+            song_info = {
+                "song_id": i,
+                "tags": song.tags,
+                "classification": song.classification
+            }
+            songs_data.append(song_info)
+            
+        system_prompt = """You are a music industry expert specializing in artist style analysis. Your task is to analyze songs and group them into core musical styles (minimum 1, maximum 10 core styles).
+
+IMPORTANT GUIDELINES:
+- DO NOT be overly sensitive with categorization
+- TRY TO COMBINE similar styles of music rather than creating too many separate categories
+- Focus on major stylistic differences, not minor variations
+- Group songs that share similar musical DNA, production style, or thematic elements
+- Each core style should have at least 1-2 songs minimum
+- Remember that classification can only be: vocal, instrumental, or song
+
+You must return a JSON response with this exact structure:
+{
+  "core_styles": [
+    {
+      "style_name": "Style Name",
+      "song_ids": [0, 1, 2],
+      "primary_characteristics": ["char1", "char2", "char3"]
+    }
+  ]
+}
+
+IMPORTANT: Your response must be valid JSON only, no additional text or explanations."""
+
+        user_prompt = f"""Analyze these {len(songs_data)} songs for artist "{artist_name}" and group them into core musical styles.
+
+Songs to analyze:
+{json.dumps(songs_data, indent=2)}
+
+Remember:
+- Combine similar styles, don't be overly sensitive
+- Maximum 10 core styles, minimum 1
+- Focus on major musical differences
+- Each style needs clear musical identity
+- Classifications are: vocal, instrumental, song
+- Return only valid JSON, no additional text"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        response = self.call_openai_api(messages, max_tokens=1500)
+        
+        if response:
+            result = self.extract_json_from_response(response)
+            if result:
+                return result
+            else:
+                print("Error parsing OpenAI response")
+                return None
+        return None
+        
+    def generate_core_style_details(self, style_name: str, song_ids: List[int], 
+                                  primary_characteristics: List[str], artist_name: str) -> Dict[str, Any]:
+        """Use OpenAI to generate detailed core style information"""
+        
+        # Get songs for this style
+        style_songs = [self.songs[i] for i in song_ids]
+        songs_info = []
+        
+        for i, song in enumerate(style_songs):
+            songs_info.append({
+                "tags": song.tags,
+                "classification": song.classification
+            })
+            
+        system_prompt = f"""You are a music industry expert writing detailed style analysis. Create comprehensive details for a core musical style.
+
+You must return a JSON response with this exact structure:
+{{
+  "style_name": "Final Style Name",
+  "description": "Detailed 200-400 character description in the style: '{artist_name}'s [STYLE] vision merges [key elements]. The productions focus on [characteristics]. By [approach], {artist_name} [impact/contribution].'",
+  "core_style_tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "signature_sound_tags": ["sound1", "sound2", "sound3", "sound4", "sound5"]
+}}
+
+The description should sound professional and music-industry focused, similar to how you'd describe an artist's style in a music magazine or streaming platform.
+
+IMPORTANT: Your response must be valid JSON only, no additional text or explanations."""
+
+        user_prompt = f"""Create detailed information for this core style:
+
+Style Name: {style_name}
+Artist: {artist_name}
+Primary Characteristics: {primary_characteristics}
+Number of Songs: {len(song_ids)}
+
+Songs in this style:
+{json.dumps(songs_info, indent=2)}
+
+Generate:
+1. A refined style name (if needed)
+2. A compelling 200-400 character description following the format shown
+3. 5 core style tags (genre/feel descriptors)
+4. 5 signature sound tags (sonic characteristics)
+
+Note: Classifications are limited to: vocal, instrumental, song
+Return only valid JSON, no additional text."""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        response = self.call_openai_api(messages, max_tokens=1200)
+        
+        if response:
+            result = self.extract_json_from_response(response)
+            if result:
+                return result
+            else:
+                print(f"Error parsing style details for {style_name}")
+                return None
+        return None
+        
+    def generate_artist_dna_tags(self, core_styles_data: List[Dict], artist_name: str) -> List[str]:
+        """Use OpenAI to generate 5 DNA-level tags summarizing all core styles"""
+        
+        system_prompt = """You are a music industry expert. Generate 5 super-tags that summarize an artist's overall musical DNA based on all their core styles.
+
+These DNA tags should capture the artist's overarching musical identity across all styles.
+
+You must return a JSON response:
+{
+  "dna_tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
+}
+
+IMPORTANT: Your response must be valid JSON only, no additional text or explanations."""
+
+        # Prepare core styles data
+        styles_summary = []
+        for style in core_styles_data:
+            style_info = {
+                "name": style.get('style_name', ''),
+                "core_tags": style.get('core_style_tags', []),
+                "signature_tags": style.get('signature_sound_tags', [])
+            }
+            styles_summary.append(style_info)
+            
+        user_prompt = f"""Generate 5 DNA-level tags for artist "{artist_name}" based on these core styles:
+
+{json.dumps(styles_summary, indent=2)}
+
+The DNA tags should represent the artist's overall musical identity that spans across all their core styles.
+
+Return only valid JSON, no additional text."""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        response = self.call_openai_api(messages, max_tokens=300)
+        
+        if response:
+            result = self.extract_json_from_response(response)
+            if result:
+                return result.get('dna_tags', [])
+            else:
+                print("Error parsing DNA tags response")
+                return []
+        return []
+        
+    def analyze_artist(self, artist_name: str = "Artist") -> Dict[str, Any]:
+        """Complete analysis pipeline using OpenAI API"""
+        
+        if not self.songs:
+            return {"error": "No songs provided for analysis"}
+            
+        print(f" Analyzing {len(self.songs)} songs for {artist_name}...")
+        print(f" Using model: {self.model}")
+        
+        # Step 1: Classify songs into core styles
+        print(" Classifying songs into core styles...")
+        classification_result = self.classify_songs_into_core_styles(artist_name)
+        
+        if not classification_result:
+            return {"error": "Failed to classify songs into core styles"}
+            
+        core_styles_data = []
+        
+        # Step 2: Generate detailed information for each core style
+        print(" Generating detailed core style information...")
+        for style_info in classification_result.get('core_styles', []):
+            style_name = style_info.get('style_name', '')
+            song_ids = style_info.get('song_ids', [])
+            characteristics = style_info.get('primary_characteristics', [])
+            
+            print(f"    Processing: {style_name}")
+            
+            style_details = self.generate_core_style_details(
+                style_name, song_ids, characteristics, artist_name
             )
             
-            caption = response.choices[0].message.content.strip()
-            
-            return {
-                "success": True,
-                "classification": classification,
-                "genres": genres,
-                "prompt": prompt,
-                "caption": caption,
-                "model_used": model
+            if style_details:
+                style_details['song_ids'] = song_ids
+                style_details['song_count'] = len(song_ids)
+                core_styles_data.append(style_details)
+                
+        # Step 3: Generate Artist DNA tags
+        print(" Generating Artist DNA tags...")
+        dna_tags = self.generate_artist_dna_tags(core_styles_data, artist_name)
+        
+        # Format final result
+        result = {
+            "artist_name": artist_name,
+            "total_songs_analyzed": len(self.songs),
+            "total_core_styles": len(core_styles_data),
+            "core_styles": core_styles_data,
+            "artist_dna": {
+                "dna_tags": dna_tags
             }
+        }
+        
+        print(" Analysis complete!")
+        return result
+        
+    def print_analysis_results(self, results: Dict[str, Any]):
+        """Print results in a formatted way"""
+        
+        if "error" in results:
+            print(f" Error: {results['error']}")
+            return
             
+        print("=" * 80)
+        print(f" {results['artist_name']} - AI-POWERED MUSIC DNA ANALYSIS")
+        print("=" * 80)
+        print(f" Songs Analyzed: {results['total_songs_analyzed']}")
+        print(f" Core Styles Found: {results['total_core_styles']}")
+        print("=" * 80)
+        
+        print("\n CORE STYLES:")
+        print("-" * 60)
+        
+        for i, style in enumerate(results['core_styles'], 1):
+            print(f"\n[{i}] {style['style_name'].upper()}")
+            print(f"      {results['artist_name']}")
+            print(f"      {style['description']}")
+            print(f"       Core Tags: {', '.join(style['core_style_tags'])}")
+            print(f"      Signature Sound: {', '.join(style['signature_sound_tags'])}")
+            print(f"      Songs: {style['song_count']} tracks")
+            print("-" * 60)
+        
+        print(f"\n🧬 ARTIST DNA TAGS:")
+        print("-" * 60)
+        print(f"    {', '.join(results['artist_dna']['dna_tags'])}")
+        
+        print("\n" + "=" * 80)
+
+    def save_results_to_json(self, results: Dict[str, Any], filename: str = "music_analysis_results.json"):
+        """Save analysis results to JSON file"""
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            print(f" Results saved to {filename}")
+            
+            # Also display file download link in Colab
+            try:
+                from google.colab import files
+                print(f" Downloading {filename} for you...")
+                files.download(filename)
+            except ImportError:
+                print(" File saved locally (not in Colab environment)")
+                
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "classification": classification,
-                "genres": genres,
-                "caption": None
-            }
+            print(f" Error saving results: {e}")
 
-def load_vad_model():
-    """Load Silero VAD model"""
-    print("Loading Silero VAD model...")
-    model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                                  model='silero_vad',
-                                  force_reload=False)
-    
-    get_speech_timestamps = utils[0]
-    return model, get_speech_timestamps
+def print_allowed_genres():
+    """Print all allowed genre tags for reference"""
+    print(" ALLOWED GENRE TAGS:")
+    print("=" * 50)
+    genres_list = sorted(list(GENRE_TAGS))
+    for i, genre in enumerate(genres_list, 1):
+        print(f"{i:2d}. {genre}")
+    print("=" * 50)
+    print(f"Total: {len(genres_list)} allowed genres")
 
-def convert_audio_with_ffmpeg(input_path, output_path):
-    """Convert audio file to WAV format using ffmpeg"""
-    try:
-        cmd = [
-            'ffmpeg', '-i', input_path, 
-            '-ar', '16000',  # Set sample rate to 16kHz
-            '-ac', '1',      # Convert to mono
-            '-y',            # Overwrite output file
-            output_path
-        ]
-        subprocess.run(cmd, check=True, capture_output=True)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
-def detect_vocals_vad(file_path, model, get_speech_timestamps):
-    """Detect vocals using VAD and return detection results"""
+def run_music_dna_analysis(artist_name: str, songs_data: List[Dict], api_key: str = None):
+    """
+    Main function to run music DNA analysis
     
-    if not os.path.exists(file_path):
-        return None, f"Error: Audio file '{file_path}' not found."
+    Args:
+        artist_name: Name of the artist
+        songs_data: List of dicts with 'tags' and 'classification' keys
+        api_key: OpenAI API key (optional if set as environment variable)
     
-    waveform = None
-    sample_rate = None
-    temp_file = None
+    Returns:
+        Dict with analysis results
+    """
     
     try:
-        # Try to load the audio file directly with torchaudio
-        try:
-            waveform, sample_rate = torchaudio.load(file_path)
-        except Exception as e1:
-            print(f"Direct loading failed: {e1}")
-            print("Trying to convert with ffmpeg...")
+        # Initialize categorizer
+        categorizer = OpenAIMusicCategorizer(api_key=api_key, model="gpt-4o")
+        
+        # Add songs
+        print(f" Adding {len(songs_data)} songs...")
+        successful_adds = 0
+        
+        for i, song_data in enumerate(songs_data):
+            if 'tags' not in song_data or 'classification' not in song_data:
+                print(f"  Skipping song {i+1}: Missing 'tags' or 'classification'")
+                continue
+                
+            success = categorizer.add_song(
+                tags=song_data["tags"],
+                classification=song_data["classification"]
+            )
             
-            # Try converting with ffmpeg
-            temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
-            temp_file.close()
+            if success:
+                successful_adds += 1
+                
+        print(f" Successfully added {successful_adds} songs")
+        
+        if successful_adds == 0:
+            print(" No valid songs to analyze!")
+            return None
             
-            if convert_audio_with_ffmpeg(file_path, temp_file.name):
-                try:
-                    waveform, sample_rate = torchaudio.load(temp_file.name)
-                    print("Successfully converted and loaded audio")
-                except Exception as e2:
-                    return None, f"Error loading converted audio: {str(e2)}"
-            else:
-                # Try using Silero's read_audio utility as last resort
-                try:
-                    print("Trying Silero's read_audio utility...")
-                    model_temp, utils_temp = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                                                           model='silero_vad',
-                                                           force_reload=False)
-                    read_audio = utils_temp[2]  # read_audio is the 3rd utility
-                    waveform = read_audio(file_path, sampling_rate=16000)
-                    sample_rate = 16000
-                    print("Successfully loaded with Silero's read_audio")
-                except Exception as e3:
-                    return None, f"All loading methods failed. Last error: {str(e3)}"
+        # Run analysis
+        results = categorizer.analyze_artist(artist_name=artist_name)
         
-        # Convert to mono if stereo
-        if len(waveform.shape) > 1 and waveform.shape[0] > 1:
-            waveform = torch.mean(waveform, dim=0, keepdim=True)
-        
-        # Ensure sample rate is 16000 Hz as required by Silero VAD
-        if sample_rate != 16000:
-            print(f"Resampling from {sample_rate} Hz to 16000 Hz...")
-            resampler = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=16000)
-            waveform = resampler(waveform)
-            sample_rate = 16000
-        
-        # Flatten to 1D array if needed
-        if len(waveform.shape) > 1:
-            waveform = waveform.squeeze()
-        
-        # Get speech timestamps using Silero VAD
-        speech_timestamps = get_speech_timestamps(waveform, model, threshold=0.5, sampling_rate=16000)
-        
-        # Calculate speech statistics
-        total_duration_seconds = len(waveform) / sample_rate
-        speech_duration = sum([t['end'] - t['start'] for t in speech_timestamps]) / sample_rate
-        speech_percentage = (speech_duration / total_duration_seconds) * 100 if total_duration_seconds > 0 else 0
-        
-        # Determine if vocal is detected
-        vocal_detected = len(speech_timestamps) > 0 and speech_percentage > 1.0
-        
-        return {
-            'vocal_detected': vocal_detected,
-            'speech_percentage': round(speech_percentage, 2),
-            'total_duration': round(total_duration_seconds, 2),
-            'speech_duration': round(speech_duration, 2)
-        }, None
-        
+        # Print and save results
+        if results and "error" not in results:
+            categorizer.print_analysis_results(results)
+            categorizer.save_results_to_json(results, f"{artist_name.replace(' ', '_')}_dna_analysis.json")
+            return results
+        else:
+            print(" Analysis failed!")
+            return results
+            
     except Exception as e:
-        return None, f"Error processing audio: {str(e)}"
+        print(f" Error in analysis: {e}")
+        return None
+
+# EXAMPLE USAGE FOR COLAB
+def example_analysis():
+    """Example analysis you can run in Colab"""
     
-    finally:
-        # Clean up temporary file if created
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
-
-def extract_genre_tags(top_tags):
-    """Extract genre tags from detected top tags"""
-    detected_genres = []
-    for tag in top_tags:
-        if tag in GENRE_TAGS:
-            detected_genres.append(tag)
-    return detected_genres
-
-def extract_instrumental_tags(top_tags):
-    """Extract instrumental tags from detected top tags"""
-    detected_instruments = []
-    for tag in top_tags:
-        if tag in INSTRUMENTAL_TAGS:
-            detected_instruments.append(tag)
-    return detected_instruments
-
-def classify_audio_tags(top_tags):
-    """Classify audio based on detected tags"""
-    # Check for definitive speech tags first - if any are present, it's definitely vocal
-    has_definitive_speech = any(tag in DEFINITIVE_SPEECH_TAGS for tag in top_tags)
+    # Sample artist data with corrected tags and classifications
+    artist_name = "SAMPLE ARTIST"
     
-    if has_definitive_speech:
-        return "Vocal"
+    sample_songs = [
+        {
+            "tags": ["Electronic music", "House music", "Dance music", "Electronic dance music"],
+            "classification": "instrumental"
+        },
+        {
+            "tags": ["Pop music", "Electronic music", "Happy music", "Dance music"],
+            "classification": "vocal"
+        },
+        {
+            "tags": ["Jazz", "Soul music", "Vocal music"],
+            "classification": "vocal"
+        },
+        {
+            "tags": ["Rock music", "Heavy metal", "Exciting music"],
+            "classification": "song"
+        },
+        {
+            "tags": ["Ambient music", "Electronic music", "Tender music"],
+            "classification": "instrumental"
+        },
+        {
+            "tags": ["Hip hop music", "Rapping", "Electronic music"],
+            "classification": "vocal"
+        },
+        {
+            "tags": ["Classical music", "Opera", "Vocal music"],
+            "classification": "vocal"
+        },
+        {
+            "tags": ["Reggae", "Happy music", "Vocal music"],
+            "classification": "song"
+        }
+    ]
     
-    # Regular classification logic as fallback
-    has_vocal = any(tag in VOCAL_TAGS for tag in top_tags)
-    has_instrumental = any(tag in INSTRUMENTAL_TAGS for tag in top_tags)
-
-    if has_vocal and not has_instrumental:
-        return "Vocal"
-    elif has_instrumental and not has_vocal:
-        return "Instrumental"
-    elif has_vocal and has_instrumental:
-        return "Song"
-
-def classify_with_tagging(audio_path, model_size="small"):
-    """Classify audio using Whisper-AT tagging"""
-    global whisper
-    
-    # Import whisper_at when needed
-    if whisper is None:
-        try:
-            import whisper_at as whisper
-        except ImportError:
-            return "Error: whisper-at not installed. Please run the setup script.", [], [], []
-    
-    print(f"Loading Whisper-AT model ({model_size}) for detailed classification...")
-    
-    audio_tagging_time_resolution = 4.8
-    
-    try:
-        start_time = time.time()
-        model = whisper.load_model(model_size)
-        print(f"Model loaded in {time.time() - start_time:.2f} seconds.")
-
-        result = model.transcribe(audio_path, at_time_res=audio_tagging_time_resolution)
-
-        audio_tag_result = whisper.parse_at_label(
-            result,
-            language='en',
-            top_k=15,
-            p_threshold=-5
-        )
-
-        all_tags_set = set()
-        tag_freq = defaultdict(int)
-
-        for segment in audio_tag_result:
-            # Update tag set and frequency
-            for tag, score in segment['audio tags']:
-                all_tags_set.add(tag)
-                tag_freq[tag] += 1
-
-        # Find top tags (those that appear more than once)
-        top_tags = [tag for tag, freq in tag_freq.items() if freq > 1]
-        
-        print(f"Detected tags: {', '.join(top_tags[:5])}...")  # Show first 5 tags
-        
-        # Extract genre and instrumental tags
-        genre_tags = extract_genre_tags(top_tags)
-        instrumental_tags = extract_instrumental_tags(top_tags)
-        
-        classification = classify_audio_tags(top_tags)
-        
-        # Return all detected tags along with classification
-        return classification, genre_tags, instrumental_tags, top_tags
-        
-    except Exception as e:
-        return f"Error in tagging: {str(e)}", [], [], []
-
-def is_vocal_classification(classification):
-    """Check if the classification indicates vocal/speech content"""
-    vocal_keywords = ["vocal", "speech", "song"]
-    return any(keyword in classification.lower() for keyword in vocal_keywords)
-
-def main():
-    parser = argparse.ArgumentParser(description='Classify audio files and generate captions using VAD and audio tagging')
-    parser.add_argument('audio_file', type=str, help='Path to the audio file')
-    parser.add_argument('--model', type=str, default='small', 
-                        choices=['tiny', 'base', 'small', 'medium', 'large-v1'],
-                        help='Whisper model size for tagging (default: small)')
-    parser.add_argument('--vad-only', action='store_true',
-                        help='Only run VAD detection without detailed tagging')
-    parser.add_argument('--openai-key', type=str, default=None,
-                        help='OpenAI API key for caption generation (can also use OPENAI_API_KEY env var)')
-    parser.add_argument('--no-caption', action='store_true',
-                        help='Skip caption generation')
-    parser.add_argument('--caption-model', type=str, default='gpt-3.5-turbo',
-                        help='OpenAI model for caption generation (default: gpt-3.5-turbo)')
-    
-    args = parser.parse_args()
-    
-    audio_path = args.audio_file
-    
-    if not os.path.exists(audio_path):
-        print(f"Error: Audio file '{audio_path}' not found.")
-        sys.exit(1)
-    
-    print(f"Processing audio file: {audio_path}")
+    print(" RUNNING EXAMPLE MUSIC DNA ANALYSIS")
     print("=" * 60)
     
-    # Step 1: VAD Detection
-    try:
-        vad_model, get_speech_timestamps = load_vad_model()
-    except Exception as e:
-        print(f"Error loading VAD model: {e}")
-        sys.exit(1)
+    # Run analysis
+    results = run_music_dna_analysis(artist_name, sample_songs)
     
-    vad_result, vad_error = detect_vocals_vad(audio_path, vad_model, get_speech_timestamps)
-    
-    if vad_error:
-        print(vad_error)
-        sys.exit(1)
-    
-    print(f"\n  VAD Results:")
-    print(f"   Vocal Detected: {'Yes' if vad_result['vocal_detected'] else 'No'}")
-    print(f"   Speech Percentage: {vad_result['speech_percentage']}%")
-    print(f"   Total Duration: {vad_result['total_duration']} seconds")
-    print(f"   Speech Duration: {vad_result['speech_duration']} seconds")
-    
-    # Step 2: Classification Logic - Always run tagging unless --vad-only is specified
-    if args.vad_only:
-        # VAD-only mode
-        if vad_result['vocal_detected']:
-            final_classification = "Vocal (VAD detected)"
-        else:
-            final_classification = "Instrumental (No vocals detected by VAD)"
-        detected_genres = []
-        detected_instruments = []
-        all_detected_tags = []
-        print(f"\n Final Classification: {final_classification}")
-        print("   Reason: VAD-only mode (detailed tagging skipped)")
-    else:
-        # Always run tagging for detailed classification
-        print(f"\n  Running audio tagging for detailed classification...")
-        tag_classification, detected_genres, detected_instruments, all_detected_tags = classify_with_tagging(audio_path, args.model)
-        
-        # Use VAD as the definitive decision maker
-        if vad_result['vocal_detected']:
-            # VAD detected vocals - use tagging for detailed classification
-            final_classification = tag_classification
-            print(f"\n Final Classification: {final_classification}")
-            print("   Reason: Vocals detected by VAD, classified using audio tagging")
-        else:
-            # VAD detected no vocals - it's definitely instrumental regardless of tagging
-            final_classification = "Instrumental"
-            print(f"\n Final Classification: {final_classification}")
-            print("   Reason: No vocals detected by VAD (definitive decision)")
-    
-    # Display genre information
-    if detected_genres:
-        print(f"\n  Detected Genres/Styles:")
-        for i, genre in enumerate(detected_genres, 1):
-            print(f"   {i}. {genre}")
-    else:
-        print(f"\n  Detected Genres/Styles: None detected")
-    
-    # Only display instrumental tags if the final classification is NOT vocal/speech
-    if not is_vocal_classification(final_classification):
-        instrumental_top_tags = [tag for tag in detected_instruments if tag in all_detected_tags]
-        if instrumental_top_tags:
-            print(f"\n  Detected Instruments (Top Tags):")
-            for i, instrument in enumerate(instrumental_top_tags, 1):
-                print(f"   {i}. {instrument}")
-        else:
-            print(f"\n  Detected Instruments (Top Tags): None detected")
-    
-    print("\n" + "=" * 60)
-    print(f"FINAL RESULT: {final_classification}")
-    if detected_genres:
-        print(f"GENRES: {', '.join(detected_genres)}")
-    
-    # Step 3: Generate Caption (if requested and API key available)
-    if not args.no_caption:
-        # Get OpenAI API key
-        openai_key = args.openai_key or os.getenv('OPENAI_API_KEY')
-        
-        if openai_key:
-            print("\n" + "=" * 60)
-            print("GENERATING CAPTION...")
-            
-            try:
-                caption_generator = AudioCaptionGenerator(openai_key)
-                caption_result = caption_generator.generate_caption(
-                    final_classification, 
-                    detected_genres, 
-                    model=args.caption_model
-                )
-                
-                if caption_result["success"]:
-                    print(f"\nGENERATED CAPTION:")
-                    print(f'"{caption_result["caption"]}"')
-                    print(f"\n[Generated using {caption_result['model_used']}]")
-                else:
-                    print(f"\nCaption generation failed: {caption_result['error']}")
-                    
-            except Exception as e:
-                print(f"\nError generating caption: {str(e)}")
-        else:
-            print(f"\n[Caption generation skipped: No OpenAI API key provided]")
-            print(f"Use --openai-key or set OPENAI_API_KEY environment variable")
-    
-    print("\n" + "=" * 60)
+    return results
 
-if __name__ == '__main__':
-    main()
+# FOR COLAB: Uncomment these lines to run
+if __name__ == "__main__":
+    print(" Music DNA Analyzer - Ready for Colab!")
+    print("=" * 60)
+    
+    # Show allowed genres
+    print_allowed_genres()
+    
+    print("\n" + "=" * 60)
+    print(" ALLOWED CLASSIFICATIONS: vocal, instrumental, song")
+    print("=" * 60)
+    
+    # Check for API key
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key:
+        print("\n  OpenAI API key not found!")
+        print(" Please set your API key:")
+        print("   import os")
+        print("   os.environ['OPENAI_API_KEY'] = 'your-api-key-here'")
+        print("\n Then run: example_analysis()")
+    else:
+        print(f"\n API key found! Running example analysis...")
+        example_analysis()
